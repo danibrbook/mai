@@ -1,0 +1,77 @@
+from flask import Flask, render_template, request, redirect, url_for, flash
+from flask_sqlalchemy import SQLAlchemy
+import os
+
+# Inicializa o aplicativo Flask
+app = Flask(__name__)
+app.secret_key = "sua_chave_secreta"  # Atualize com uma chave segura
+
+# Configuração do Banco de Dados
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+db_path = os.path.join(BASE_DIR, "BRbook.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Inicializa o SQLAlchemy
+db = SQLAlchemy(app)
+
+# Modelo do banco de dados (exemplo)
+class Usuario(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    senha = db.Column(db.String(100), nullable=False)
+
+# Rotas principais
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    if request.method == "POST":
+        nome = request.form["nome"]
+        email = request.form["email"]
+        senha = request.form["senha"]
+
+        # Verifica se o usuário já existe
+        usuario_existente = Usuario.query.filter_by(email=email).first()
+        if usuario_existente:
+            flash("Usuário já cadastrado!", "danger")
+            return redirect(url_for("cadastro"))
+
+        # Adiciona o novo usuário ao banco de dados
+        novo_usuario = Usuario(nome=nome, email=email, senha=senha)
+        db.session.add(novo_usuario)
+        db.session.commit()
+        flash("Cadastro realizado com sucesso!", "success")
+        return redirect(url_for("index"))
+
+    return render_template("cadastro.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form["email"]
+        senha = request.form["senha"]
+
+        # Verifica as credenciais do usuário
+        usuario = Usuario.query.filter_by(email=email, senha=senha).first()
+        if usuario:
+            flash("Login realizado com sucesso!", "success")
+            return redirect(url_for("index"))
+        else:
+            flash("Email ou senha inválidos!", "danger")
+            return redirect(url_for("login"))
+
+    return render_template("login.html")
+
+# Comando para criar o banco de dados
+@app.before_first_request
+def criar_banco():
+    db.create_all()
+
+# Rodar a aplicação
+if __name__ == "__main__":
+    # Configuração para a Render
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
